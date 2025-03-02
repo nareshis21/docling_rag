@@ -11,25 +11,25 @@ from utils.qa import QAEngine
 # Configure Streamlit page
 st.set_page_config(page_title="AI-Powered Document QA", layout="wide")
 
-# Background Image
-def add_bg_from_local(image_file):
-    with open(image_file, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read())
-    st.markdown(
-        f"""
-        <style>
-            .stApp {{
-                background-image: url(data:image/png;base64,{encoded_string.decode()});
-                background-size: cover;
-            }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+# # Background Image
+# def add_bg_from_local(image_file):
+#     with open(image_file, "rb") as image_file:
+#         encoded_string = base64.b64encode(image_file.read())
+#     st.markdown(
+#         f"""
+#         <style>
+#             .stApp {{
+#                 background-image: url(data:image/png;base64,{encoded_string.decode()});
+#                 background-size: cover;
+#             }}
+#         </style>
+#         """,
+#         unsafe_allow_html=True,
+#     )
 
-# Path to background image
-image_bg = "./image/background.jpeg"  # Change this path accordingly
-add_bg_from_local(image_bg)
+# # Path to background image
+# image_bg = "./image/background.jpeg"  # Change this path accordingly
+# add_bg_from_local(image_bg)
 
 # Initialize document processing & AI components
 document_processor = DocumentProcessor()
