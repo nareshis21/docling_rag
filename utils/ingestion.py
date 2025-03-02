@@ -3,6 +3,7 @@ import time
 import os
 from pathlib import Path
 from typing import Dict, Any, List
+import chromadb
 
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 from docling.datamodel.base_models import InputFormat
@@ -15,7 +16,10 @@ from docling.datamodel.pipeline_options import (
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-import chromadb
+
+from docx import Document  # DOCX support
+from pptx import Presentation  # PPTX support
+from bs4 import BeautifulSoup  # HTML support
 
 
 class DocumentProcessor:
@@ -33,13 +37,12 @@ class DocumentProcessor:
         pipeline_options.table_structure_options.do_cell_matching = True
         pipeline_options.ocr_options.lang = ["en"]
         pipeline_options.table_structure_options.mode = TableFormerMode.ACCURATE
-        
-        # ✅ Automatically handle CPU fallback
+
         try:
             pipeline_options.accelerator_options = AcceleratorOptions(
                 num_threads=8, device=AcceleratorDevice.MPS
             )
-        except Exception as e:
+        except Exception:
             print("⚠️ MPS is not available. Falling back to CPU.")
             pipeline_options.accelerator_options = AcceleratorOptions(
                 num_threads=8, device=AcceleratorDevice.CPU
@@ -79,21 +82,69 @@ class DocumentProcessor:
 
         return metadata
 
-    def process_document(self, pdf_path: str):
+    def extract_text_from_docx(self, docx_path: str) -> List[str]:
+        """Extract text from a DOCX file"""
+        doc = Document(docx_path)
+        return [para.text.strip() for para in doc.paragraphs if para.text.strip()]
+
+    def extract_text_from_pptx(self, pptx_path: str) -> List[str]:
+        """Extract text from a PPTX file"""
+        ppt = Presentation(pptx_path)
+        slides_text = []
+        for slide in ppt.slides:
+            text = " ".join([shape.text for shape in slide.shapes if hasattr(shape, "text")])
+            if text.strip():
+                slides_text.append(text.strip())
+        return slides_text
+
+    def extract_text_from_html(self, html_path: str) -> List[str]:
+        """Extract text from an HTML file"""
+        with open(html_path, "r", encoding="utf-8") as file:
+            soup = BeautifulSoup(file, "html.parser")
+        return [text.strip() for text in soup.stripped_strings if text.strip()]
+
+    def extract_text_from_txt(self, txt_path: str) -> List[str]:
+        """Extract text from a TXT file"""
+        with open(txt_path, "r", encoding="utf-8") as file:
+            lines = file.readlines()
+        return [line.strip() for line in lines if line.strip()]
+
+    def process_document(self, file_path: str):
         """Process document and create searchable index with metadata"""
-        print(f"📄 Processing document: {pdf_path}")
+        print(f"📄 Processing document: {file_path}")
         start_time = time.time()
+        file_ext = Path(file_path).suffix.lower()
 
-        result = self.converter.convert(pdf_path)
-        doc = result.document
+        if file_ext == ".pdf":
+            result = self.converter.convert(file_path)
+            doc = result.document
+            chunker = HybridChunker(tokenizer="jinaai/jina-embeddings-v3")
+            chunks = list(chunker.chunk(doc))
 
-        chunker = HybridChunker(tokenizer="jinaai/jina-embeddings-v3")
-        chunks = list(chunker.chunk(doc))
+            processed_chunks = []
+            for chunk in chunks:
+                metadata = self.extract_chunk_metadata(chunk)
+                processed_chunks.append(metadata)
 
-        processed_chunks = []
-        for chunk in chunks:
-            metadata = self.extract_chunk_metadata(chunk)
-            processed_chunks.append(metadata)
+        elif file_ext == ".docx":
+            texts = self.extract_text_from_docx(file_path)
+            processed_chunks = [{"text": text, "headings": [], "content_type": "DOCX"} for text in texts]
+
+        elif file_ext == ".pptx":
+            texts = self.extract_text_from_pptx(file_path)
+            processed_chunks = [{"text": text, "headings": [], "content_type": "PPTX"} for text in texts]
+
+        elif file_ext == ".html":
+            texts = self.extract_text_from_html(file_path)
+            processed_chunks = [{"text": text, "headings": [], "content_type": "HTML"} for text in texts]
+
+        elif file_ext == ".txt":
+            texts = self.extract_text_from_txt(file_path)
+            processed_chunks = [{"text": text, "headings": [], "content_type": "TXT"} for text in texts]
+
+        else:
+            print(f"❌ Unsupported file format: {file_ext}")
+            return None
 
         print("✅ Chunking completed. Creating vector database...")
         collection = self.client.get_or_create_collection(name="document_chunks")
@@ -114,7 +165,6 @@ class DocumentProcessor:
             embeddings.append(embedding)
             metadata_list.append({
                 "headings": json.dumps(chunk.get('headings', [])),
-                "page": chunk.get('page_info', None),
                 "content_type": chunk.get('content_type', None)
             })
             ids.append(str(idx))
