@@ -78,7 +78,7 @@ Modify `config.py` to adjust parameters like:
 ---
 
 ## **Contributors**  
-👤 **Your Name** – Developer  
+👤 **Naresh Kumar Lahajal** – Developer  
 
 ---
 
