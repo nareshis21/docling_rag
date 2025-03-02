@@ -95,4 +95,4 @@ if user_input:
     memory_storage.add_ai_message(answer)
 
     with st.chat_message("assistant"):
-        st.markdown(answer)
+        st.markdown(answer.content)
