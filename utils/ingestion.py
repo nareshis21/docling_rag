@@ -3,7 +3,6 @@ import time
 import os
 from pathlib import Path
 from typing import Dict, Any, List
-from tempfile import mkdtemp
 
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 from docling.datamodel.base_models import InputFormat
@@ -24,7 +23,7 @@ class DocumentProcessor:
         """Initialize document processor with necessary components"""
         self.setup_document_converter()
         self.embed_model = FastEmbedEmbeddings()
-        self.client = chromadb.PersistentClient(path=mkdtemp())  # Persistent storage
+        self.client = chromadb.PersistentClient(path="chroma_db")  # Persistent Storage
 
     def setup_document_converter(self):
         """Configure document converter with advanced processing capabilities"""
@@ -34,9 +33,17 @@ class DocumentProcessor:
         pipeline_options.table_structure_options.do_cell_matching = True
         pipeline_options.ocr_options.lang = ["en"]
         pipeline_options.table_structure_options.mode = TableFormerMode.ACCURATE
-        pipeline_options.accelerator_options = AcceleratorOptions(
-            num_threads=8, device=AcceleratorDevice.MPS
-        )
+        
+        # ✅ Automatically handle CPU fallback
+        try:
+            pipeline_options.accelerator_options = AcceleratorOptions(
+                num_threads=8, device=AcceleratorDevice.MPS
+            )
+        except Exception as e:
+            print("⚠️ MPS is not available. Falling back to CPU.")
+            pipeline_options.accelerator_options = AcceleratorOptions(
+                num_threads=8, device=AcceleratorDevice.CPU
+            )
 
         self.converter = DocumentConverter(
             format_options={
@@ -50,7 +57,7 @@ class DocumentProcessor:
     def extract_chunk_metadata(self, chunk) -> Dict[str, Any]:
         """Extract essential metadata from a chunk"""
         metadata = {
-            "text": chunk.text,
+            "text": chunk.text.strip(),
             "headings": [],
             "page_info": None,
             "content_type": None
@@ -72,9 +79,9 @@ class DocumentProcessor:
 
         return metadata
 
-    def process_document(self, pdf_path: str) -> Any:
+    def process_document(self, pdf_path: str):
         """Process document and create searchable index with metadata"""
-        print(f"Processing document: {pdf_path}")
+        print(f"📄 Processing document: {pdf_path}")
         start_time = time.time()
 
         result = self.converter.convert(pdf_path)
@@ -88,7 +95,7 @@ class DocumentProcessor:
             metadata = self.extract_chunk_metadata(chunk)
             processed_chunks.append(metadata)
 
-        print("\nCreating vector database...")
+        print("✅ Chunking completed. Creating vector database...")
         collection = self.client.get_or_create_collection(name="document_chunks")
 
         documents = []
@@ -97,23 +104,30 @@ class DocumentProcessor:
         ids = []
 
         for idx, chunk in enumerate(processed_chunks):
-            embedding = self.embed_model.encode(chunk['text'])
-            documents.append(chunk['text'])
+            text = chunk.get('text', '').strip()
+            if not text:
+                print(f"⚠️ Skipping empty chunk at index {idx}")
+                continue  # Skip empty chunks
+
+            embedding = self.embed_model.embed_documents([text])[0]  # ✅ Corrected method
+            documents.append(text)
             embeddings.append(embedding)
             metadata_list.append({
-                "headings": json.dumps(chunk['headings']),
-                "page": chunk['page_info'],
-                "content_type": chunk['content_type']
+                "headings": json.dumps(chunk.get('headings', [])),
+                "page": chunk.get('page_info', None),
+                "content_type": chunk.get('content_type', None)
             })
             ids.append(str(idx))
 
-        collection.add(
-            ids=ids,
-            embeddings=embeddings,
-            documents=documents,
-            metadatas=metadata_list
-        )
+        if documents:
+            collection.add(
+                ids=ids,
+                embeddings=embeddings,
+                documents=documents,
+                metadatas=metadata_list
+            )
+            print(f"✅ Successfully added {len(documents)} chunks to the database.")
 
         processing_time = time.time() - start_time
-        print(f"\nDocument processing completed in {processing_time:.2f} seconds")
+        print(f"✅ Document processing completed in {processing_time:.2f} seconds")
         return collection
