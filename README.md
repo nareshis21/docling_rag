@@ -8,6 +8,11 @@ The app extracts and indexes text from multiple document formats (**PDF, DOCX, P
 
 ---
 
+## **Try It Out** 🚀  
+👉 **Live Demo:** [Docling RAG QA App on Hugging Face](https://huggingface.co/spaces/NEXAS/docling_rag)  
+
+---
+
 ## **Features**  
 ✅ **Upload & process multiple documents** (PDF, DOCX, PPTX, HTML, TXT)  
 ✅ **Automated text extraction**  
@@ -61,10 +66,10 @@ This will launch the **web interface** in your browser.
 ---
 
 ## **Configuration**  
-Modify `config.py` to adjust parameters like:  
-- **ChromaDB storage path**  
-- **Embedding model**  
-- **Max chunk size**  
+Modify parameters in the `utils` directory:  
+- **Change embedding model settings in** `utils/llm.py`  
+- **Adjust document processing settings in** `utils/ingestion.py`  
+- **Modify database storage options in** `utils/db.py`  
 
 ---
 
@@ -87,4 +92,6 @@ Modify `config.py` to adjust parameters like:
 
 ---
 
-This **Docling RAG QA App** makes document-based Q&A **fast, efficient, and user-friendly** with **Streamlit UI**! 🚀 Let me know if you need modifications!
+This **Docling RAG QA App** makes document-based Q&A **fast, efficient, and user-friendly** with **Streamlit UI**! 🚀  
+
+👉 **Try it out now:** [Docling RAG QA App on Hugging Face](https://huggingface.co/spaces/NEXAS/docling_rag)  
