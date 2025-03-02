@@ -38,12 +38,12 @@ class LLMProcessor:
 
     def generate_answer(self, context: str, question: str) -> str:
         """Generate answer using structured context"""
-        prompt = f"""Based on the following excerpts from a document:
-
-{context}
-
-Please answer this question: {question}
-
-Make use of the section information and page numbers in your answer when relevant.
+        prompt = f"""Use the following pieces of information to answer the user's question.
+If you don't know the answer, just say that you don't know,if it is out of context say that it is out of context and also try to provide the answer and don't be rude.
+Context: {context}
+Question: {question}
+Only return the helpful answer below and nothing else.
+Helpful answer:
 """
+
         return self.llm.invoke(prompt)
