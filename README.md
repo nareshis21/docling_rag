@@ -21,7 +21,7 @@ The app extracts and indexes text from multiple document formats (**PDF, DOCX, P
 ## **Installation**  
 ### **1️⃣ Clone the repository**  
 ```bash
-git clone https://github.com/your-repo/docling_rag.git
+git clone https://github.com/nareshis21/docling_rag.git
 cd docling_rag
 ```
 
